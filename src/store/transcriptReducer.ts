@@ -28,7 +28,7 @@ function parseTimestamp(ts: string | undefined): number {
   return isNaN(parsed) ? Date.now() : parsed;
 }
 
-function buildBlocks(lines: TranscriptLine[]): {
+export function buildBlocks(lines: TranscriptLine[]): {
   blocks: Block[];
   totalTokens: number;
   modelId: string | null;
@@ -102,6 +102,9 @@ function buildBlocks(lines: TranscriptLine[]): {
 
       // Skip empty/noise user messages (no meaningful content)
       if (!content.trim()) continue;
+
+      // Skip interrupted-by-user placeholder messages
+      if (content.trim().startsWith("[Request interrupted by user for tool use]")) continue;
 
       // User messages don't have usage data from the API.
       // Estimate tokens from content length (~4 chars per token).

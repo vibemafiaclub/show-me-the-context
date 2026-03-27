@@ -90,7 +90,7 @@ export function ContextVisScreen({ state, onBack }: ContextVisScreenProps) {
   const userBlocks = windowBlocks.filter(({ block }) => block.type === 'user');
   const boxBlocks = windowBlocks.filter(({ block }) => block.type !== 'user');
 
-  const userLines = userBlocks.length; // 각 1줄
+  const userLines = userBlocks.length * 2; // 각 2줄
   const borderLines = boxBlocks.length * 2; // 박스 블록만 border 있음
   const interiorLines = Math.max(boxBlocks.length || 1, availableLines - userLines - borderLines);
 

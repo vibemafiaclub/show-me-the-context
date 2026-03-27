@@ -1,6 +1,6 @@
-import React from 'react';
-import { Box, Text } from 'ink';
-import type { Block, ClaudeBlock } from '../core/types.js';
+import React from "react";
+import { Box, Text, useStdout } from "ink";
+import type { Block, ClaudeBlock } from "../core/types.js";
 
 interface BlockItemProps {
   block: Block;
@@ -9,23 +9,95 @@ interface BlockItemProps {
   height: number; // interior row count, pre-calculated proportionally
 }
 
-function getColor(type: Block['type']): string {
+function getColor(type: Block["type"]): string {
   switch (type) {
-    case 'system': return 'blue';
-    case 'user': return 'green';
-    case 'claude': return 'yellow';
+    case "system":
+      return "blue";
+    case "user":
+      return "green";
+    case "claude":
+      return "yellow";
   }
 }
 
-function getLabel(type: Block['type']): string {
+function getLabel(type: Block["type"]): string {
   switch (type) {
-    case 'system': return 'System';
-    case 'user': return 'User';
-    case 'claude': return 'Claude';
+    case "system":
+      return "System";
+    case "user":
+      return "User";
+    case "claude":
+      return "Claude";
   }
 }
 
-export function BlockItem({ block, summary, isFocused, height }: BlockItemProps) {
+// 왼쪽 고정 영역 폭: 커서(2) + 박스(12) + 간격(4) = 18
+const LEFT_FIXED_WIDTH = 18;
+
+// CJK 문자(한글, 한자, 일본어 등)는 터미널에서 2칸을 차지함
+function charWidth(code: number): number {
+  // CJK Unified Ideographs, Hangul Syllables, Katakana, etc.
+  if (
+    (code >= 0x1100 && code <= 0x115f) || // Hangul Jamo
+    (code >= 0x2e80 && code <= 0x303e) || // CJK Radicals, Kangxi, Ideographic
+    (code >= 0x3040 && code <= 0x33bf) || // Hiragana, Katakana, CJK Compatibility
+    (code >= 0x3400 && code <= 0x4dbf) || // CJK Unified Extension A
+    (code >= 0x4e00 && code <= 0xa4cf) || // CJK Unified, Yi Syllables
+    (code >= 0xac00 && code <= 0xd7af) || // Hangul Syllables
+    (code >= 0xf900 && code <= 0xfaff) || // CJK Compatibility Ideographs
+    (code >= 0xfe30 && code <= 0xfe4f) || // CJK Compatibility Forms
+    (code >= 0xff01 && code <= 0xff60) || // Fullwidth Forms
+    (code >= 0xffe0 && code <= 0xffe6) || // Fullwidth Signs
+    (code >= 0x20000 && code <= 0x2fa1f)  // CJK Extensions B-F, Compatibility Supplement
+  ) {
+    return 2;
+  }
+  return 1;
+}
+
+function displayWidth(text: string): number {
+  let w = 0;
+  for (const ch of text) {
+    w += charWidth(ch.codePointAt(0)!);
+  }
+  return w;
+}
+
+function truncateToWidth(text: string, maxWidth: number): string {
+  if (maxWidth <= 3) {
+    let w = 0;
+    let result = "";
+    for (const ch of text) {
+      const cw = charWidth(ch.codePointAt(0)!);
+      if (w + cw > maxWidth) break;
+      result += ch;
+      w += cw;
+    }
+    return result;
+  }
+  if (displayWidth(text) <= maxWidth) return text;
+  // Truncate to fit maxWidth - 3 (for "...") based on display width
+  let w = 0;
+  let result = "";
+  for (const ch of text) {
+    const cw = charWidth(ch.codePointAt(0)!);
+    if (w + cw > maxWidth - 3) break;
+    result += ch;
+    w += cw;
+  }
+  return result + "...";
+}
+
+export function BlockItem({
+  block,
+  summary,
+  isFocused,
+  height,
+}: BlockItemProps) {
+  const { stdout } = useStdout();
+  const termWidth = stdout?.columns ?? 80;
+  const maxRightWidth = Math.max(10, termWidth - LEFT_FIXED_WIDTH);
+
   const color = getColor(block.type);
   const label = getLabel(block.type);
 
@@ -35,52 +107,67 @@ export function BlockItem({ block, summary, isFocused, height }: BlockItemProps)
   const centerRow = Math.floor((totalRows - 1) / 2);
 
   const rawText = summary ?? block.content;
-  const firstLine = rawText.split('\n')[0] ?? rawText;
-  const truncated = firstLine.length > 60
-    ? firstLine.slice(0, 57) + '...'
-    : firstLine;
+  const firstLine = rawText.split("\n")[0] ?? rawText;
+  const truncated = truncateToWidth(firstLine, maxRightWidth);
 
-  const claudeBlock = block.type === 'claude' ? (block as ClaudeBlock) : null;
+  const claudeBlock = block.type === "claude" ? (block as ClaudeBlock) : null;
 
   // Right-side labels for each row
   function rightLabel(i: number): React.ReactNode {
     if (i === 0) {
-      return <Text bold color={color}>{`${label} (${block.tokens.toLocaleString()} tokens)`}</Text>;
+      const headerText = `${label} (${block.tokens.toLocaleString()} tokens)`;
+      return (
+        <Text
+          bold
+          color={color}
+        >{truncateToWidth(headerText, maxRightWidth)}</Text>
+      );
     }
     if (i === 1) {
       return <Text>{truncated}</Text>;
     }
-    if (claudeBlock && i === 2 && claudeBlock.fileChanges.length > 0) {
-      return (
-        <Box flexDirection="row">
-          {claudeBlock.fileChanges.map((fc, fi) => (
-            <Box key={fi} flexDirection="row">
-              <Text>{fc.path + ' '}</Text>
-              <Text color="green">{'+' + fc.added}</Text>
-              <Text>{' '}</Text>
-              <Text color="red">{'-' + fc.removed}</Text>
-              <Text>{fi < claudeBlock.fileChanges.length - 1 ? ' | ' : ''}</Text>
-            </Box>
-          ))}
-        </Box>
+    if (claudeBlock && i === 2) {
+      const totalAdded = claudeBlock.fileChanges.reduce(
+        (s, fc) => s + fc.added,
+        0,
       );
-    }
-    if (claudeBlock && i === (claudeBlock.fileChanges.length > 0 ? 3 : 2)) {
+      const totalRemoved = claudeBlock.fileChanges.reduce(
+        (s, fc) => s + fc.removed,
+        0,
+      );
+      const changePart =
+        totalAdded + totalRemoved > 0
+          ? ` | Changes: +${totalAdded} -${totalRemoved}`
+          : "";
+      const infoText = `Tools: ${claudeBlock.toolCallCount} | Thinking: ${claudeBlock.thinkingTokens.toLocaleString()} tokens${changePart}`;
       return (
-        <Text dimColor>{`Tools: ${claudeBlock.toolCallCount} | Thinking: ${claudeBlock.thinkingTokens.toLocaleString()} tokens`}</Text>
+        <Text
+          dimColor
+        >{truncateToWidth(infoText, maxRightWidth)}</Text>
       );
     }
     return null;
   }
 
-  // User 블록: 박스 없이 초록색 한 줄로 표시
-  if (block.type === 'user') {
+  // User 블록: 2줄 (┌─ top + └─ content)
+  if (block.type === "user") {
     return (
-      <Box flexDirection="row">
-        <Text>{isFocused ? '> ' : '  '}</Text>
-        <Text color="green" bold>{'● '}</Text>
-        <Text color="green">{`User: ${truncated}`}</Text>
-        <Text color="green" dimColor>{` (${block.tokens.toLocaleString()} tokens)`}</Text>
+      <Box flexDirection="column">
+        <Box flexDirection="row">
+          <Text>{isFocused ? "> " : "  "}</Text>
+          <Text color="green">{"┌" + "─".repeat(10) + "┐"}</Text>
+          <Text>{"    "}</Text>
+          <Text
+            bold
+            color="green"
+          >{truncateToWidth(`User (${block.tokens.toLocaleString()} tokens)`, maxRightWidth)}</Text>
+        </Box>
+        <Box flexDirection="row">
+          <Text>{"  "}</Text>
+          <Text color="green">{"└" + "─".repeat(10) + "┘"}</Text>
+          <Text>{"    "}</Text>
+          <Text color="green">{truncated}</Text>
+        </Box>
       </Box>
     );
   }
@@ -89,28 +176,28 @@ export function BlockItem({ block, summary, isFocused, height }: BlockItemProps)
     <Box flexDirection="column">
       {/* Top border (row 0) */}
       <Box flexDirection="row">
-        <Text>{isFocused && centerRow === 0 ? '> ' : '  '}</Text>
-        <Text color={color}>{'┌' + '─'.repeat(10) + '┐'}</Text>
-        <Text>{'    '}</Text>
+        <Text>{isFocused && centerRow === 0 ? "> " : "  "}</Text>
+        <Text color={color}>{"┌" + "─".repeat(10) + "┐"}</Text>
+        <Text>{"    "}</Text>
         {rightLabel(0)}
       </Box>
 
       {/* Interior rows (row 1..height) */}
       {Array.from({ length: Math.max(1, height) }).map((_, i) => (
         <Box key={i} flexDirection="row">
-          <Text>{isFocused && centerRow === i + 1 ? '> ' : '  '}</Text>
-          <Text color={color}>{'│'}</Text>
-          <Text>{'          '}</Text>
-          <Text color={color}>{'│'}</Text>
-          <Text>{'    '}</Text>
+          <Text>{isFocused && centerRow === i + 1 ? "> " : "  "}</Text>
+          <Text color={color}>{"│"}</Text>
+          <Text>{"          "}</Text>
+          <Text color={color}>{"│"}</Text>
+          <Text>{"    "}</Text>
           {rightLabel(i + 1)}
         </Box>
       ))}
 
       {/* Bottom border (row height+1) */}
       <Box flexDirection="row">
-        <Text>{isFocused && centerRow === height + 1 ? '> ' : '  '}</Text>
-        <Text color={color}>{'└' + '─'.repeat(10) + '┘'}</Text>
+        <Text>{isFocused && centerRow === height + 1 ? "> " : "  "}</Text>
+        <Text color={color}>{"└" + "─".repeat(10) + "┘"}</Text>
       </Box>
     </Box>
   );
