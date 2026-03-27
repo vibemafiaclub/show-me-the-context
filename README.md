@@ -2,24 +2,9 @@
 
 > Visualize your context window — for Claude Code
 
-A terminal tool that shows you **how much of your context window is being used** in real time while using Claude Code.
+![demo.png](./assets/demo.png)
 
-```
-[ ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ ] Context: 198,234 / 1,000,000 (19.8%)
-============================================================
-  ┌──────────┐    System (45,231 tokens)
-  │          │
-  │          │
-  └──────────┘
-  ● User: Refactor this function (342 tokens)
-> ┌──────────┐    Claude (152,661 tokens)
-  │          │    src/auth/login.ts +12 -8 | src/auth/types.ts +3 -1
-  │          │    Tools: 5 | Thinking: 2,340 tokens
-  │          │
-  │          │
-  └──────────┘
-[FOLLOW] ↑↓ navigate  ESC re-enable follow  Enter toggle detail  q back [3/3]
-```
+A terminal tool that shows you **how much of your context window is being used** in real time while using Claude Code.
 
 ## Why?
 
@@ -48,12 +33,12 @@ Then start `claude` in another terminal — it will be detected and visualized i
 
 ## Controls
 
-| Key | Action |
-|-----|--------|
-| `↑` `↓` | Navigate blocks |
-| `Enter` | View block details |
-| `ESC` | Return to follow mode / close details |
-| `q` | Go back |
+| Key     | Action                                |
+| ------- | ------------------------------------- |
+| `↑` `↓` | Navigate blocks                       |
+| `Enter` | View block details                    |
+| `ESC`   | Return to follow mode / close details |
+| `q`     | Go back                               |
 
 ## License
 
