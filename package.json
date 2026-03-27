@@ -1,6 +1,6 @@
 {
   "name": "show-me-the-context",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Show me the Context - Claude Code 에이전트의 컨텍스트 소모량/사고과정/툴 사용을 실시간 시각화하는 TUI",
   "type": "module",
   "main": "dist/index.js",
